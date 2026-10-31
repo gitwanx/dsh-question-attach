@@ -1,7 +1,9 @@
-# dsh-question-attach
+# 随答附图 · dsh-question-attach
 
 > 给 DeepSeek Harness 的**宿主问答卡**加一条「附图 / 文件」栏：选项照常选，按「继续」时，
 > 图与文件**跟在回答后面**发给同一个 Agent。不改 `app.asar`，一个脚本装、一个脚本还原。
+
+中文名 **随答附图**（包名 `@local/dsh-question-attach`，仓库 `dsh-question-attach`）。
 
 适用于 DSH 桌面版 / Web 版（`0.2.x`）。纯浏览器插件 + 一个只写日志的宿主路由，无外部依赖。
 
