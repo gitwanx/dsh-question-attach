@@ -1,0 +1,12 @@
+# 忽略装机时产生的本地备份与临时文件
+tools/backup/
+*.log
+*.tmp
+node_modules/
+__pycache__/
+test/sample*.png
+test/sample.txt
+.DS_Store
+
+# 发布用的令牌：绝不能进仓库
+.token

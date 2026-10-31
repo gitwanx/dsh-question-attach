@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>question-attach harness v2</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 24px; }
+      .frame { width: 520px; }
+      .card { border: 1px solid #ccc; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+      .body { max-height: 120px; overflow: auto; }
+      .options { display: flex; flex-direction: column; gap: 4px; }
+      footer { display: flex; justify-content: flex-end; gap: 6px; }
+    </style>
+  </head>
+  <body>
+    <!-- key 里那一段故意写成线上那种裸 uuid（不是 Session 身份）：
+         插件必须回落到 uiSession.current 才能找到会话 —— 复现 2026-11-01 00:16 的 no-session。
+         结构与 dsh-client-ui-user-questions 一致：
+         frame[data-question-key] > section > header / div[data-question-scroll] / footer -->
+    <div class="frame" data-question-key="question:deadbeefdeadbeefdeadbeef:call-42">
+      <section class="card">
+        <header><h2>用哪套配色？</h2><button type="button" class="x">×</button></header>
+        <div class="body" data-question-scroll="true">
+          <div class="options">
+            <button type="button" role="radio" aria-checked="false">暖色</button>
+            <button type="button" role="radio" aria-checked="false">冷色</button>
+          </div>
+          <textarea placeholder="自己写答案"></textarea>
+        </div>
+        <footer>
+          <button type="button" id="skip">跳过</button>
+          <button type="button" id="submit">继续</button>
+        </footer>
+      </section>
+    </div>
+
+    <script>
+      window.__sent = []
+      window.__ping = []
+      window.__uploadDelay = 300
+      window.__uploadCalls = []
+      window.fetch = (url) => {
+        window.__ping.push(String(url))
+        return Promise.resolve(new Response('{"ok":true}', { status: 200 }))
+      }
+      const fakeSession = {
+        prompt(content, mode) {
+          const parts = content.map((part) => ({
+            type: part.type,
+            mediaType: part.mediaType,
+            name: part.name,
+            text: part.text,
+            receiptId: part.receiptId,
+            dataLength: typeof part.data === 'string' ? part.data.length : undefined,
+            dataPrefix: typeof part.data === 'string' ? part.data.slice(0, 8) : undefined,
+          }))
+          window.__sent.push({ mode, parts })
+          return Promise.resolve({ ok: true, value: { accepted: true } })
+        },
+      }
+      const fakeFileUpload = {
+        upload(sessionId, blob, name, signal, onProgress) {
+          window.__uploadCalls.push({ sessionId, name, bytes: blob && blob.size })
+          return new Promise((resolve, reject) => {
+            const total = blob && blob.size ? blob.size : 0
+            onProgress && onProgress({ loaded: Math.round(total / 2), total })
+            const timer = setTimeout(() => {
+              onProgress && onProgress({ loaded: total, total })
+              resolve({ ok: true, value: { receiptId: 'rcpt-' + name, file: { attachmentId: 'att-' + name, name, bytes: total } } })
+            }, window.__uploadDelay)
+            if (signal) signal.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('aborted')) })
+          })
+        },
+      }
+      const fakeCtx = {
+        sessions: { binding: (id) => (id === 'session-test-0001' ? { session: fakeSession } : undefined) },
+        uiSession: { current: { getSnapshot: () => ({ key: 'session-test-0001' }) } },
+        fileUpload: fakeFileUpload,
+        get: (name) => fakeCtx[name],
+        effect(fn) {
+          const dispose = typeof fn === 'function' ? fn() : undefined
+          return typeof dispose === 'function' ? dispose : () => {}
+        },
+      }
+      window.__ModuleLoader__ = {
+        load(mod) {
+          const api = mod.factory(() => ({ createElement: () => null }))
+          window.__plugin = api
+          api.apply(fakeCtx)
+        },
+      }
+    </script>
+    <script src="../client.js"></script>
+  </body>
+</html>

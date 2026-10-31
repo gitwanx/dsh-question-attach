@@ -1,0 +1,35 @@
+{
+  "name": "@local/dsh-question-attach",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "宿主问答卡「附图/文件」增强：卡片里留一条栏，选项选完按继续时，图片内联、其它文件先上传，随后随回答发给同一个 Agent；不改 app.asar。",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-file-upload"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5"
+  }
+}
