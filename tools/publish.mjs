@@ -30,6 +30,12 @@ const SKIP_DIRS = new Set(['.git', 'node_modules', '__pycache__', 'backup'])
 const SKIP_FILES = new Set(['.token', 'package-lock.json'])
 const SKIP_EXT = ['.log', '.tmp']
 
+const DESCRIPTION = 'DSH 宿主问答卡「附图/文件」插件：只在提问时出现，选项选完按继续时把图片与文件跟在回答后面发给同一个 Agent；不改 app.asar。'
+const COMMIT_MESSAGE =
+  'feat: DSH 问答卡「附图/文件」插件 v0.3.0\n\n' +
+  '只在问答卡出现时挂一条栏；选项选完按继续时，图片内联、其它文件先上传，\n' +
+  '随后随回答发给同一个 Agent。不改 app.asar，卸载可逐字节还原。'
+
 function readToken() {
   if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN.trim()
   const file = path.join(ROOT, '.token')
@@ -105,23 +111,38 @@ async function main() {
   console.log(`\n账号：${owner}　仓库：${owner}/${repo}　${isPrivate ? '私有' : '公开'}`)
 
   // 1) 仓库已存在就复用，不存在就建
+  let repoInfo
   let exists = true
   try {
-    await api(token, 'GET', `/repos/${owner}/${repo}`)
+    repoInfo = await api(token, 'GET', `/repos/${owner}/${repo}`)
     console.log('  仓库已存在，复用')
   } catch (error) {
     exists = false
   }
   if (!exists) {
-    await api(token, 'POST', '/user/repos', {
+    repoInfo = await api(token, 'POST', '/user/repos', {
       name: repo,
-      description: 'DSH 宿主问答卡「附图/文件」插件：选项选完按继续，图与文件跟在回答后面发给同一个 Agent；不改 app.asar。',
+      description: DESCRIPTION,
       private: isPrivate,
       has_issues: true,
       has_wiki: false,
       auto_init: false,
     })
     console.log('  已创建空仓库')
+  } else if (repoInfo.private === true && !isPrivate) {
+    // 你要的是开源：顺手把私有改成公开（需要 token 有 Administration 权限）
+    await api(token, 'PATCH', `/repos/${owner}/${repo}`, { private: false, description: DESCRIPTION })
+    console.log('  已把仓库改成公开')
+  }
+
+  // 已有 main 就接在它后面提交，不覆盖历史
+  let parentSha
+  try {
+    const ref = await api(token, 'GET', `/repos/${owner}/${repo}/git/ref/heads/main`)
+    parentSha = ref.object.sha
+    console.log(`  接到已有提交后面：${parentSha.slice(0, 7)}`)
+  } catch (error) {
+    parentSha = undefined
   }
 
   // 2) 每个文件一个 blob
@@ -136,9 +157,9 @@ async function main() {
   // 3) 一棵树 + 一次提交 + 推 main
   const tree = await api(token, 'POST', `/repos/${owner}/${repo}/git/trees`, { tree: blobs })
   const commit = await api(token, 'POST', `/repos/${owner}/${repo}/git/commits`, {
-    message: 'feat: DSH 问答卡「附图/文件」插件 v0.3.0\n\n只在问答卡出现时挂一条栏，选项选完按继续时把图片/文件\n跟在回答后面发给同一个 Agent。不改 app.asar，卸载可逐字节还原。',
+    message: COMMIT_MESSAGE,
     tree: tree.sha,
-    parents: [],
+    parents: parentSha === undefined ? [] : [parentSha],
   })
   let branchExists = true
   try {
