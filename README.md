@@ -112,10 +112,20 @@ DSH 升级如果改了它们，表现是**栏不出现**（不会损坏任何东
 - 卡片 key 里那段 id **不是**能拿去 `sessions.binding()` 的会话身份 → 必须回落到 `uiSession.current`。
 - 卡片的标题/选项是**纯文本**渲染，只有 `detail` 走 Markdown —— 模型写问题时别用 `**加粗**`。
 
+## 更新记录
+
+**0.3.1 —— 文案跟着「语言」走，不再看 `<html lang>`**
+
+插件 bundle 往往比 locales 服务先执行，那一刻 `<html lang>` 还是模板里的 `en`，界面其实是中文，
+于是栏上出现了「+ Attach / Pick options, hit Continue…」。现在以 `locale` 服务的
+`getSnapshot().active` 为准，并 `subscribe` 变化：中途换语言，已经挂着的栏就地换文案。
+
+**0.3.0** —— Ctrl+V 粘贴截图、缩略图全屏预览、会话回落（修 `client:no-session`）。
+
 ## 声明
 
 - 本仓库不包含 DeepSeek Harness 的任何代码或资源，只调用它的公开客户端服务
-  （`sessions` / `uiSession` / `fileUpload` / `remote`）和插件装载协议。
+  （`sessions` / `uiSession` / `fileUpload` / `locale` / `remote`）和插件装载协议。
 - 安装脚本会改**你本机**的 `~/.dsh/profiles/desktop/cordis.patch.yml`，改前自动备份，`卸载.cmd` 可逐字节还原。
 - 与 DeepSeek 官方无关，按 MIT 发布。
 
@@ -123,4 +133,4 @@ DSH 升级如果改了它们，表现是**栏不出现**（不会损坏任何东
 
 MIT，见 [LICENSE](LICENSE)。
 
-v0.3.0 · 2026-11-01
+v0.3.1 · 2026-11-01

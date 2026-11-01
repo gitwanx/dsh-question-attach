@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>question-attach harness v2</title>
@@ -72,9 +72,26 @@
           })
         },
       }
+      // 语言：故意让 <html lang="en">（DSH 模板就是这样），真正的语言在 locale 服务里
+      window.__locale = 'zh'
+      const localeListeners = new Set()
+      const fakeLocale = {
+        getSnapshot: () => ({ active: window.__locale }),
+        subscribe(fn) {
+          localeListeners.add(fn)
+          return () => localeListeners.delete(fn)
+        },
+        setLocale(id) {
+          window.__locale = id
+          for (const fn of localeListeners) fn()
+        },
+      }
+      window.__setLocale = (id) => fakeLocale.setLocale(id)
+
       const fakeCtx = {
         sessions: { binding: (id) => (id === 'session-test-0001' ? { session: fakeSession } : undefined) },
         uiSession: { current: { getSnapshot: () => ({ key: 'session-test-0001' }) } },
+        locale: fakeLocale,
         fileUpload: fakeFileUpload,
         get: (name) => fakeCtx[name],
         effect(fn) {

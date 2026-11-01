@@ -89,6 +89,20 @@ def main() -> int:
         check("无 JS 异常", not errors, "; ".join(errors))
         check("mount ping 到了", any("ev=mount" in u for u in page.evaluate("window.__ping")))
 
+        # ---- 1b. 语言：<html lang="en"> 但 app locale 是 zh → 文案必须中文（2026-11-01 线上 bug） ----
+        add_text = page.locator("[data-qattach] .qaAdd").inner_text()
+        hint_text = page.locator("[data-qattach] .qaHint").inner_text()
+        check("html lang=en 但 locale=zh 时用中文", "附图" in add_text, add_text)
+        check("提示文字也是中文", "继续" in hint_text or "Ctrl+V" in hint_text, hint_text)
+        page.evaluate("window.__setLocale('en')")
+        page.wait_for_timeout(120)
+        check("切到 en 后文案跟着变英文", "Attach" in page.locator("[data-qattach] .qaAdd").inner_text(),
+              page.locator("[data-qattach] .qaAdd").inner_text())
+        page.evaluate("window.__setLocale('zh')")
+        page.wait_for_timeout(120)
+        check("切回 zh 又变中文", "附图" in page.locator("[data-qattach] .qaAdd").inner_text(),
+              page.locator("[data-qattach] .qaAdd").inner_text())
+
         # ---- 2. 图片：内联 base64 ----
         page.set_input_files("[data-qattach] input[type=file]", str(PNG))
         page.wait_for_selector(".qaChipImg img", timeout=5000)

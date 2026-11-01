@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-question-attach",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "宿主问答卡「附图/文件」增强：卡片里留一条栏，选项选完按继续时，图片内联、其它文件先上传，随后随回答发给同一个 Agent；不改 app.asar。",

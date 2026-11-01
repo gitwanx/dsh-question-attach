@@ -61,8 +61,32 @@ window.__ModuleLoader__.load({
       fail: 'Not sent: ',
       noSession: 'No active session to send these to',
     }
-    const lang = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) || ''
-    const copy = /^zh/i.test(lang) || lang === '' ? zh : en
+    // 语言不能只看 document.documentElement.lang：插件 bundle 常常比 locales 服务更早执行，
+    // 那一刻 `<html lang>` 还是模板里的 en（界面其实是中文）。所以以 locale 服务的 active 为准，
+    // document.lang / navigator.language 只作为兜底，并订阅变化随时换文案。
+    let copy = zh
+
+    function activeLanguage(ctx) {
+      try {
+        const locale = ctx.get('locale')
+        const snapshot = locale && typeof locale.getSnapshot === 'function' ? locale.getSnapshot() : undefined
+        const active = snapshot && typeof snapshot.active === 'string' ? snapshot.active : ''
+        if (active !== '') return active
+      } catch (error) {
+        /* locale 服务可能还没起来 */
+      }
+      const documentLang = typeof document !== 'undefined' && document.documentElement ? document.documentElement.lang : ''
+      if (documentLang) return documentLang
+      return typeof navigator !== 'undefined' && navigator.language ? navigator.language : ''
+    }
+
+    function copyFor(ctx) {
+      const language = String(activeLanguage(ctx) || '')
+      if (/^zh/i.test(language) || /[-_]hans/i.test(language)) return zh
+      if (/^en/i.test(language)) return en
+      const fallback = typeof navigator !== 'undefined' && navigator.language ? navigator.language : ''
+      return /^zh/i.test(fallback) ? zh : en
+    }
 
     const states = new Map()
     let observer = null
@@ -267,6 +291,16 @@ window.__ModuleLoader__.load({
       document.addEventListener('keydown', onKey, true)
       document.body.appendChild(overlay)
       ping('preview', 'open')
+    }
+
+    /** 语言变了：把已经挂上去的那条栏就地换文案，不重建 DOM。 */
+    function applyCopy(state) {
+      if (state.add !== null) {
+        state.add.textContent = copy.add
+        state.add.title = copy.addTitle
+      }
+      if (state.hint !== null && !state.busy) setHint(state, baseHint(state), '')
+      renderRail(state)
     }
 
     function renderRail(state) {
@@ -761,18 +795,36 @@ window.__ModuleLoader__.load({
         ctx.effect(mountStyles, 'question-attach: stylesheet')
         ctx.effect(() => {
           const pasteHandler = makePasteHandler(ctx)
+          copy = copyFor(ctx)
+          // locale 服务晚到、或用户中途换语言：已经挂着的栏就地换文案。
+          let unsubscribeLocale = () => {}
+          try {
+            const locale = ctx.get('locale')
+            if (locale && typeof locale.subscribe === 'function') {
+              unsubscribeLocale = locale.subscribe(() => {
+                const next = copyFor(ctx)
+                if (next === copy) return
+                copy = next
+                for (const state of states.values()) applyCopy(state)
+              })
+            }
+          } catch (error) {
+            /* 没有 locale 服务就只靠初次判定 */
+          }
           const start = () => {
+            copy = copyFor(ctx)
             augment(ctx)
             observer = new MutationObserver(() => schedule(ctx))
             observer.observe(document.body, { childList: true, subtree: true })
             document.addEventListener('pointerdown', armFromEvent, true)
             document.addEventListener('keydown', armFromEvent, true)
             document.addEventListener('paste', pasteHandler, true)
-            ping('mount', 'v4')
+            ping('mount', 'v5')
           }
           if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true })
           else start()
           return () => {
+            unsubscribeLocale()
             if (observer !== null) {
               observer.disconnect()
               observer = null
